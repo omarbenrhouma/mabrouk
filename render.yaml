@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: ayouta-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm --workspace backend run db:generate && npm --workspace backend run build
+    preDeployCommand: npm --workspace backend run db:deploy
+    startCommand: npm --workspace backend run start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: LOG_LEVEL
+        value: info

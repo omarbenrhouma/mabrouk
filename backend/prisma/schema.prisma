@@ -1,0 +1,231 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  STORE_MANAGER
+  EMPLOYEE
+}
+
+enum ContractType {
+  CDI
+  CDD
+  PART_TIME
+  SEASONAL
+  INTERN
+}
+
+enum ShiftStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+}
+
+enum AttendanceStatus {
+  EXPECTED
+  PRESENT
+  LATE
+  ABSENT
+  LEFT_EARLY
+  CORRECTED
+}
+
+enum RequestType {
+  ABSENCE
+  SHIFT_CHANGE
+  REPLACEMENT
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum NotificationType {
+  SHIFT_PUBLISHED
+  SHIFT_UPDATED
+  REQUEST_CREATED
+  REQUEST_REVIEWED
+  ATTENDANCE_ANOMALY
+}
+
+model User {
+  id              String            @id @default(cuid())
+  name            String
+  email           String            @unique
+  passwordHash    String
+  role            Role              @default(EMPLOYEE)
+  isActive        Boolean           @default(true)
+  employeeProfile EmployeeProfile?
+  managedStores   Store[]           @relation("StoreManager")
+  auditLogs       AuditLog[]         @relation("AuditActor")
+  notifications   Notification[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+}
+
+model Store {
+  id             String            @id @default(cuid())
+  code           String            @unique
+  name           String
+  address        String
+  city           String
+  timezone       String            @default("Africa/Tunis")
+  openingTime    String
+  closingTime    String
+  targetStaff    Int               @default(1)
+  managerId      String?
+  manager        User?             @relation("StoreManager", fields: [managerId], references: [id], onDelete: SetNull)
+  isActive       Boolean           @default(true)
+  employees      EmployeeProfile[] @relation("PrimaryStore")
+  assignments    Assignment[]
+  shifts         ScheduleShift[]
+  attendances    Attendance[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([city, isActive])
+}
+
+model EmployeeProfile {
+  id             String          @id @default(cuid())
+  userId         String          @unique
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone          String?
+  contractType   ContractType
+  weeklyHours    Int             @default(40)
+  jobTitle        String         @default("Vendeur")
+  availability   Json?
+  hireDate       DateTime
+  primaryStoreId String?
+  primaryStore   Store?          @relation("PrimaryStore", fields: [primaryStoreId], references: [id], onDelete: SetNull)
+  isActive       Boolean         @default(true)
+  assignments    Assignment[]
+  shifts         ScheduleShift[]
+  attendances    Attendance[]
+  requests       ChangeRequest[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model Assignment {
+  id         String          @id @default(cuid())
+  employeeId String
+  employee   EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  storeId    String
+  store      Store           @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  startDate  DateTime
+  endDate    DateTime?
+  reason     String
+  createdBy  String
+  createdAt  DateTime        @default(now())
+
+  @@index([employeeId, startDate, endDate])
+  @@index([storeId, startDate, endDate])
+}
+
+model ScheduleShift {
+  id         String          @id @default(cuid())
+  employeeId String
+  employee   EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  storeId    String
+  store      Store           @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  startsAt   DateTime
+  endsAt     DateTime
+  breakMins  Int             @default(0)
+  position   String          @default("Vente")
+  status     ShiftStatus     @default(DRAFT)
+  createdBy  String
+  updatedBy  String
+  attendance Attendance?
+  requests   ChangeRequest[]
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@index([employeeId, startsAt, endsAt])
+  @@index([storeId, startsAt])
+}
+
+model Attendance {
+  id               String           @id @default(cuid())
+  employeeId       String
+  employee         EmployeeProfile  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  storeId          String
+  store            Store            @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  shiftId          String?          @unique
+  shift            ScheduleShift?   @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  checkInAt        DateTime?
+  checkOutAt       DateTime?
+  breakStartedAt   DateTime?
+  breakEndedAt     DateTime?
+  varianceMins     Int?
+  status           AttendanceStatus @default(EXPECTED)
+  correctionReason String?
+  correctedBy      String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([employeeId, createdAt])
+  @@index([storeId, createdAt])
+}
+
+model ChangeRequest {
+  id             String          @id @default(cuid())
+  employeeId     String
+  employee       EmployeeProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  shiftId         String?
+  shift           ScheduleShift?  @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  requestType    RequestType
+  requestedDate  DateTime
+  requestedStart DateTime?
+  requestedEnd   DateTime?
+  reason         String
+  status         RequestStatus   @default(PENDING)
+  reviewedBy     String?
+  reviewedAt     DateTime?
+  reviewComment  String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([status, requestedDate])
+  @@index([shiftId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  entityType String
+  entityId   String
+  action     String
+  oldValue   Json?
+  newValue   Json?
+  comment    String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  message   String
+  entityId  String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, readAt, createdAt])
+}

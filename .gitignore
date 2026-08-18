@@ -1,0 +1,12 @@
+node_modules
+dist
+*.log
+frontend/node_modules
+frontend/dist
+backend/node_modules
+backend/dist
+.env
+backend/.env
+*.tsbuildinfo
+*.backup
+*.dump
