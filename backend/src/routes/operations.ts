@@ -1,6 +1,6 @@
 import { AttendanceStatus, ContractType, RequestStatus, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -45,7 +45,7 @@ export function operationsRouter(secret: string) {
   const router = Router();
   router.use(requireAuth(secret));
 
-  router.get("/me", async (request, response) => {
+  router.get("/me", async (request: Request, response: Response) => {
     const user = await prisma.user.findUnique({
       where: { id: request.auth!.userId },
       select: { id: true, name: true, email: true, role: true, isActive: true }
@@ -55,7 +55,7 @@ export function operationsRouter(secret: string) {
     return response.json({ data: { ...user, employee } });
   });
 
-  router.get("/dashboard", async (request, response) => {
+  router.get("/dashboard", async (request: Request, response: Response) => {
     const now = new Date();
     const startOfDay = new Date(now);
     startOfDay.setHours(0, 0, 0, 0);
@@ -110,7 +110,7 @@ export function operationsRouter(secret: string) {
     });
   });
 
-  router.get("/employees", requireAuth(secret, [Role.ADMIN, Role.STORE_MANAGER]), async (_request, response) => {
+  router.get("/employees", requireAuth(secret, [Role.ADMIN, Role.STORE_MANAGER]), async (_request: Request, response: Response) => {
     const employees = await prisma.employeeProfile.findMany({
       include: {
         user: { select: { id: true, name: true, email: true, role: true, isActive: true } },
@@ -122,7 +122,7 @@ export function operationsRouter(secret: string) {
     response.json({ data: employees });
   });
 
-  router.post("/employees", requireAuth(secret, [Role.ADMIN]), async (request, response) => {
+  router.post("/employees", requireAuth(secret, [Role.ADMIN]), async (request: Request, response: Response) => {
     const input = employeeInput.parse(request.body);
     const passwordHash = await bcrypt.hash(input.password, 12);
     try {
@@ -155,7 +155,7 @@ export function operationsRouter(secret: string) {
     }
   });
 
-  router.patch("/employees/:id", requireAuth(secret, [Role.ADMIN]), async (request, response) => {
+  router.patch("/employees/:id", requireAuth(secret, [Role.ADMIN]), async (request: Request, response: Response) => {
     const id = String(request.params.id);
     const input = employeeInput.omit({ password: true }).partial().extend({ isActive: z.boolean().optional() }).parse(request.body);
     const current = await prisma.employeeProfile.findUnique({ where: { id }, include: { user: true } });
@@ -187,7 +187,7 @@ export function operationsRouter(secret: string) {
     return response.json({ data: employee });
   });
 
-  router.delete("/employees/:id", requireAuth(secret, [Role.ADMIN]), async (request, response) => {
+  router.delete("/employees/:id", requireAuth(secret, [Role.ADMIN]), async (request: Request, response: Response) => {
     const id = String(request.params.id);
     const current = await prisma.employeeProfile.findUnique({ where: { id } });
     if (!current) return response.status(404).json({ error: "Employé introuvable" });
@@ -201,7 +201,7 @@ export function operationsRouter(secret: string) {
     return response.status(204).send();
   });
 
-  router.get("/employees/:id/assignments", requireAuth(secret, [Role.ADMIN, Role.STORE_MANAGER]), async (request, response) => {
+  router.get("/employees/:id/assignments", requireAuth(secret, [Role.ADMIN, Role.STORE_MANAGER]), async (request: Request, response: Response) => {
     const assignments = await prisma.assignment.findMany({
       where: { employeeId: String(request.params.id) },
       include: { store: { select: { id: true, code: true, name: true } } },
@@ -210,7 +210,7 @@ export function operationsRouter(secret: string) {
     response.json({ data: assignments });
   });
 
-  router.post("/employees/:id/assignments", requireAuth(secret, [Role.ADMIN, Role.STORE_MANAGER]), async (request, response) => {
+  router.post("/employees/:id/assignments", requireAuth(secret, [Role.ADMIN, Role.STORE_MANAGER]), async (request: Request, response: Response) => {
     const employeeId = String(request.params.id);
     const input = assignmentInput.parse(request.body);
     const overlap = await prisma.assignment.findFirst({
@@ -231,7 +231,7 @@ export function operationsRouter(secret: string) {
     return response.status(201).json({ data: assignment });
   });
 
-  router.get("/attendances", async (request, response) => {
+  router.get("/attendances", async (request: Request, response: Response) => {
     const query = z.object({ from: z.coerce.date().optional(), to: z.coerce.date().optional() }).parse(request.query);
     const employee = request.auth!.role === Role.EMPLOYEE ? await employeeForUser(request.auth!.userId) : null;
     const attendances = await prisma.attendance.findMany({
@@ -250,7 +250,7 @@ export function operationsRouter(secret: string) {
     response.json({ data: attendances });
   });
 
-  router.post("/attendances/check-in", requireAuth(secret, [Role.EMPLOYEE]), async (request, response) => {
+  router.post("/attendances/check-in", requireAuth(secret, [Role.EMPLOYEE]), async (request: Request, response: Response) => {
     const input = z.object({ shiftId: z.string().min(1) }).parse(request.body);
     const employee = await employeeForUser(request.auth!.userId);
     if (!employee) return response.status(404).json({ error: "Profil employé introuvable" });
@@ -273,7 +273,7 @@ export function operationsRouter(secret: string) {
     return response.status(201).json({ data: attendance });
   });
 
-  router.post("/attendances/check-out", requireAuth(secret, [Role.EMPLOYEE]), async (request, response) => {
+  router.post("/attendances/check-out", requireAuth(secret, [Role.EMPLOYEE]), async (request: Request, response: Response) => {
     const input = z.object({ shiftId: z.string().min(1) }).parse(request.body);
     const employee = await employeeForUser(request.auth!.userId);
     if (!employee) return response.status(404).json({ error: "Profil employé introuvable" });
@@ -287,7 +287,7 @@ export function operationsRouter(secret: string) {
     return response.json({ data: updated });
   });
 
-  router.post("/attendances/break", requireAuth(secret, [Role.EMPLOYEE]), async (request, response) => {
+  router.post("/attendances/break", requireAuth(secret, [Role.EMPLOYEE]), async (request: Request, response: Response) => {
     const input = z.object({ shiftId: z.string().min(1), action: z.enum(["START", "END"]) }).parse(request.body);
     const employee = await employeeForUser(request.auth!.userId);
     if (!employee) return response.status(404).json({ error: "Profil employé introuvable" });
@@ -302,7 +302,7 @@ export function operationsRouter(secret: string) {
     return response.json({ data: updated });
   });
 
-  router.patch("/attendances/:id/correct", requireAuth(secret, [Role.ADMIN, Role.STORE_MANAGER]), async (request, response) => {
+  router.patch("/attendances/:id/correct", requireAuth(secret, [Role.ADMIN, Role.STORE_MANAGER]), async (request: Request, response: Response) => {
     const id = String(request.params.id);
     const input = z.object({
       checkInAt: z.coerce.date().optional(),
@@ -326,7 +326,7 @@ export function operationsRouter(secret: string) {
     return response.json({ data: updated });
   });
 
-  router.get("/requests", async (request, response) => {
+  router.get("/requests", async (request: Request, response: Response) => {
     const employee = request.auth!.role === Role.EMPLOYEE ? await employeeForUser(request.auth!.userId) : null;
     const requests = await prisma.changeRequest.findMany({
       where: { employeeId: employee?.id },
@@ -337,7 +337,7 @@ export function operationsRouter(secret: string) {
     response.json({ data: requests });
   });
 
-  router.post("/requests", requireAuth(secret, [Role.EMPLOYEE]), async (request, response) => {
+  router.post("/requests", requireAuth(secret, [Role.EMPLOYEE]), async (request: Request, response: Response) => {
     const input = requestInput.parse(request.body);
     const employee = await employeeForUser(request.auth!.userId);
     if (!employee) return response.status(404).json({ error: "Profil employé introuvable" });
@@ -358,7 +358,7 @@ export function operationsRouter(secret: string) {
     return response.status(201).json({ data: created });
   });
 
-  router.patch("/requests/:id/review", requireAuth(secret, [Role.ADMIN, Role.STORE_MANAGER]), async (request, response) => {
+  router.patch("/requests/:id/review", requireAuth(secret, [Role.ADMIN, Role.STORE_MANAGER]), async (request: Request, response: Response) => {
     const input = z.object({
       status: z.enum(["APPROVED", "REJECTED"]),
       reviewComment: z.string().trim().min(3).max(500)
@@ -405,7 +405,7 @@ export function operationsRouter(secret: string) {
     return response.json({ data: updated });
   });
 
-  router.get("/notifications", async (request, response) => {
+  router.get("/notifications", async (request: Request, response: Response) => {
     const notifications = await prisma.notification.findMany({
       where: { userId: request.auth!.userId },
       orderBy: { createdAt: "desc" },
@@ -414,7 +414,7 @@ export function operationsRouter(secret: string) {
     response.json({ data: notifications });
   });
 
-  router.get("/audit-logs", requireAuth(secret, [Role.ADMIN]), async (request, response) => {
+  router.get("/audit-logs", requireAuth(secret, [Role.ADMIN]), async (request: Request, response: Response) => {
     const query = z.object({
       entityType: z.string().optional(),
       limit: z.coerce.number().int().min(1).max(200).default(50)
@@ -428,7 +428,7 @@ export function operationsRouter(secret: string) {
     response.json({ data: logs });
   });
 
-  router.patch("/notifications/:id/read", async (request, response) => {
+  router.patch("/notifications/:id/read", async (request: Request, response: Response) => {
     const notification = await prisma.notification.findFirst({
       where: { id: String(request.params.id), userId: request.auth!.userId }
     });

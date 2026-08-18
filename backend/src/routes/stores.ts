@@ -1,5 +1,5 @@
 import { Role } from "@prisma/client";
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -19,7 +19,7 @@ export function storesRouter(secret: string) {
   const router = Router();
   router.use(requireAuth(secret));
 
-  router.get("/", async (_request, response) => {
+  router.get("/", async (_request: Request, response: Response) => {
     const stores = await prisma.store.findMany({
       where: { isActive: true },
       include: { manager: { select: { id: true, name: true } }, _count: { select: { employees: true } } },
@@ -28,7 +28,7 @@ export function storesRouter(secret: string) {
     response.json({ data: stores });
   });
 
-  router.post("/", requireAuth(secret, [Role.ADMIN]), async (request, response) => {
+  router.post("/", requireAuth(secret, [Role.ADMIN]), async (request: Request, response: Response) => {
     const input = createStore.parse(request.body);
     const store = await prisma.store.create({ data: input });
     await prisma.auditLog.create({
@@ -37,7 +37,7 @@ export function storesRouter(secret: string) {
     response.status(201).json({ data: store });
   });
 
-  router.patch("/:id", requireAuth(secret, [Role.ADMIN]), async (request, response) => {
+  router.patch("/:id", requireAuth(secret, [Role.ADMIN]), async (request: Request, response: Response) => {
     const id = String(request.params.id);
     const input = updateStore.parse(request.body);
     const current = await prisma.store.findUnique({ where: { id } });
@@ -49,7 +49,7 @@ export function storesRouter(secret: string) {
     return response.json({ data: store });
   });
 
-  router.delete("/:id", requireAuth(secret, [Role.ADMIN]), async (request, response) => {
+  router.delete("/:id", requireAuth(secret, [Role.ADMIN]), async (request: Request, response: Response) => {
     const id = String(request.params.id);
     const current = await prisma.store.findUnique({ where: { id } });
     if (!current) return response.status(404).json({ error: "Boutique introuvable" });
