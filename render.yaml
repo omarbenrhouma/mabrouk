@@ -3,7 +3,7 @@ services:
     name: ayouta-api
     runtime: node
     plan: free
-    buildCommand: npm ci && npm --workspace backend run db:generate && npm --workspace backend run build
+    buildCommand: npm ci --include=dev && npm --workspace backend run db:generate && npm --workspace backend run build
     preDeployCommand: npm --workspace backend run db:deploy
     startCommand: npm --workspace backend run start
     healthCheckPath: /health
