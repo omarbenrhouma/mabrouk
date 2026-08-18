@@ -1,5 +1,5 @@
 import { Role } from "@prisma/client";
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -18,7 +18,7 @@ export function shiftsRouter(secret: string) {
   const router = Router();
   router.use(requireAuth(secret));
 
-  router.get("/", async (request, response) => {
+  router.get("/", async (request: Request, response: Response) => {
     const query = z.object({
       from: z.coerce.date(),
       to: z.coerce.date(),
@@ -35,7 +35,7 @@ export function shiftsRouter(secret: string) {
     response.json({ data: shifts });
   });
 
-  router.post("/", requireAuth(secret, [Role.ADMIN, Role.STORE_MANAGER]), async (request, response) => {
+  router.post("/", requireAuth(secret, [Role.ADMIN, Role.STORE_MANAGER]), async (request: Request, response: Response) => {
     const input = shiftInput.parse(request.body);
     const conflict = await prisma.scheduleShift.findFirst({
       where: {
@@ -56,7 +56,7 @@ export function shiftsRouter(secret: string) {
     return response.status(201).json({ data: shift });
   });
 
-  router.patch("/:id", requireAuth(secret, [Role.ADMIN, Role.STORE_MANAGER]), async (request, response) => {
+  router.patch("/:id", requireAuth(secret, [Role.ADMIN, Role.STORE_MANAGER]), async (request: Request, response: Response) => {
     const id = String(request.params.id);
     const input = shiftFields.partial().parse(request.body);
     const current = await prisma.scheduleShift.findUnique({ where: { id } });
@@ -85,7 +85,7 @@ export function shiftsRouter(secret: string) {
     return response.json({ data: shift });
   });
 
-  router.post("/:id/publish", requireAuth(secret, [Role.ADMIN, Role.STORE_MANAGER]), async (request, response) => {
+  router.post("/:id/publish", requireAuth(secret, [Role.ADMIN, Role.STORE_MANAGER]), async (request: Request, response: Response) => {
     const id = String(request.params.id);
     const current = await prisma.scheduleShift.findUnique({ where: { id }, include: { employee: true, store: true } });
     if (!current) return response.status(404).json({ error: "Shift introuvable" });
@@ -105,7 +105,7 @@ export function shiftsRouter(secret: string) {
     return response.json({ data: shift });
   });
 
-  router.delete("/:id", requireAuth(secret, [Role.ADMIN, Role.STORE_MANAGER]), async (request, response) => {
+  router.delete("/:id", requireAuth(secret, [Role.ADMIN, Role.STORE_MANAGER]), async (request: Request, response: Response) => {
     const id = String(request.params.id);
     const current = await prisma.scheduleShift.findUnique({ where: { id } });
     if (!current) return response.status(404).json({ error: "Shift introuvable" });
